@@ -1,11 +1,13 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, get_jwt_identity
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash
 from datetime import datetime, timedelta
 import logging
 
-from models import db, User, AuditLog
+from api.models.user import User
+from api.models.audit_log import AuditLog
+# db will be accessed via current_app.extensions['sqlalchemy'].db when needed
 from utils.decorators import role_required
 
 auth_bp = Blueprint('auth', __name__)
@@ -148,6 +150,7 @@ def register():
         )
         new_user.set_password(data['password'])
         
+        db = current_app.extensions['sqlalchemy'].db
         db.session.add(new_user)
         db.session.commit()
         
@@ -172,6 +175,66 @@ def register():
         logger.error(f"User registration error: {str(e)}")
         db.session.rollback()
         return jsonify({'error': 'User creation failed'}), 500
+
+@auth_bp.route('/signup', methods=['POST'])
+def public_signup():
+    """Public employee signup endpoint (role=staff only)"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+
+        # Validate required fields
+        required_fields = ['username', 'email', 'password', 'first_name', 'last_name']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'{field} is required'}), 400
+
+        # Check if username already exists
+        if User.get_by_username(data['username']):
+            return jsonify({'error': 'Username already exists'}), 400
+
+        # Check if email already exists
+        if User.get_by_email(data['email']):
+            return jsonify({'error': 'Email already exists'}), 400
+
+        # Only allow role=staff for public signup
+        role = 'staff'
+
+        # Create new user
+        new_user = User(
+            username=data['username'],
+            email=data['email'],
+            first_name=data['first_name'],
+            last_name=data['last_name'],
+            role=role,
+            is_verified=False
+        )
+        new_user.set_password(data['password'])
+
+        db = current_app.extensions['sqlalchemy'].db
+        db.session.add(new_user)
+        db.session.commit()
+
+        # Log the user creation (optional, if AuditLog is available)
+        # AuditLog.log_activity(
+        #     user_id=new_user.id,
+        #     action='public_signup',
+        #     table_name='users',
+        #     record_id=new_user.id,
+        #     notes=f"User self-registered: {new_user.username}",
+        #     ip_address=request.remote_addr,
+        #     user_agent=request.headers.get('User-Agent')
+        # )
+
+        return jsonify({
+            'message': 'Signup successful. Please wait for admin verification (if required).',
+            'user': new_user.to_dict()
+        }), 201
+
+    except Exception as e:
+        current_app.logger.error(f"Public signup error: {str(e)}")
+        return jsonify({'error': 'Signup failed'}), 500
 
 @auth_bp.route('/profile', methods=['GET', 'PUT'])
 @jwt_required()

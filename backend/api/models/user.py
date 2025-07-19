@@ -3,6 +3,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import relationship
 
 db = SQLAlchemy()
 
@@ -129,3 +130,9 @@ class User(UserMixin, db.Model):
     
     def __repr__(self):
         return f'<User {self.username}>' 
+
+# Import AuditLog at the end to avoid circular import
+from .audit_log import AuditLog
+
+# Now, if you want to add the relationship, do it after both classes are defined:
+User.audit_logs = relationship("AuditLog", back_populates="user") 

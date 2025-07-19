@@ -1,7 +1,8 @@
 from functools import wraps
 from flask import jsonify, request
 from flask_jwt_extended import get_jwt_identity
-from models import User, AuditLog
+from api.models.user import User
+from api.models.audit_log import AuditLog
 
 def role_required(allowed_roles):
     """Decorator to check if user has required role"""

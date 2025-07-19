@@ -1,626 +1,949 @@
-// Dashboard JavaScript
-class InventoryManagementSystem {
+// ===== ENTERPRISE DASHBOARD JAVASCRIPT =====
+
+class IPMSDashboard {
     constructor() {
-        this.currentUser = {
-            name: 'John Doe',
-            role: 'Manager',
-            permissions: ['inventory', 'purchase_orders', 'suppliers', 'reports']
-        };
-        
-        this.inventoryData = [
-            {
-                sku: 'SKU001',
-                name: 'Steel Pipes',
-                category: 'Raw Materials',
-                quantity: 150,
-                location: 'Warehouse A',
-                unitPrice: 25.50,
-                status: 'In Stock'
-            },
-            {
-                sku: 'SKU002',
-                name: 'Aluminum Sheets',
-                category: 'Raw Materials',
-                quantity: 5,
-                location: 'Warehouse B',
-                unitPrice: 45.75,
-                status: 'Low Stock'
-            },
-            {
-                sku: 'SKU003',
-                name: 'Finished Product A',
-                category: 'Finished Goods',
-                quantity: 75,
-                location: 'Warehouse A',
-                unitPrice: 120.00,
-                status: 'In Stock'
-            }
-        ];
-        
-        this.purchaseOrders = [
-            {
-                id: 'PO-2025-001',
-                supplier: 'ABC Suppliers',
-                items: 'Steel Pipes, Aluminum Sheets',
-                totalAmount: 2500.00,
-                status: 'Approved',
-                createdDate: '2025-01-15'
-            },
-            {
-                id: 'PO-2025-002',
-                supplier: 'XYZ Manufacturing',
-                items: 'Electronic Components',
-                totalAmount: 1800.00,
-                status: 'Pending',
-                createdDate: '2025-01-20'
-            }
-        ];
-        
-        this.suppliers = [
-            {
-                id: 'SUP001',
-                companyName: 'ABC Suppliers',
-                contactPerson: 'John Smith',
-                email: 'john@abcsuppliers.com',
-                phone: '+1234567890',
-                category: 'Raw Materials'
-            },
-            {
-                id: 'SUP002',
-                companyName: 'XYZ Manufacturing',
-                contactPerson: 'Jane Doe',
-                email: 'jane@xyzmanufacturing.com',
-                phone: '+0987654321',
-                category: 'Equipment'
-            }
-        ];
+        this.currentUser = null;
+        this.charts = {};
+        this.notifications = [];
+        this.activities = [];
+        this.isLoading = true;
+        this.apiBaseUrl = 'http://localhost:5000/api';
         
         this.init();
     }
-    
-    init() {
-        this.setupEventListeners();
-        this.loadDashboardData();
-        this.setupRoleBasedAccess();
-        this.initializeCharts();
+
+    async init() {
+        try {
+            // Check authentication
+            await this.checkAuth();
+            
+            // Initialize components
+            this.initializeComponents();
+            this.setupEventListeners();
+            this.loadDashboardData();
+            this.initializeCharts();
+            this.startRealTimeUpdates();
+            
+            // Hide loading screen
+            setTimeout(() => {
+                this.hideLoadingScreen();
+            }, 1500);
+            
+        } catch (error) {
+            console.error('Dashboard initialization failed:', error);
+            this.showError('Failed to initialize dashboard');
+        }
     }
-    
+
+    async checkAuth() {
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            window.location.href = 'index.html';
+            return;
+        }
+
+        try {
+            const response = await fetch(`${this.apiBaseUrl}/auth/me`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                throw new Error('Authentication failed');
+            }
+
+            const data = await response.json();
+            this.currentUser = data.user;
+            this.updateUserInfo();
+        } catch (error) {
+            console.error('Auth check failed:', error);
+            localStorage.removeItem('access_token');
+            window.location.href = 'index.html';
+        }
+    }
+
+    initializeComponents() {
+        // Initialize date/time display
+        this.updateDateTime();
+        setInterval(() => this.updateDateTime(), 1000);
+
+        // Initialize sidebar
+        this.initializeSidebar();
+
+        // Initialize modals
+        this.initializeModals();
+
+        // Initialize search functionality
+        this.initializeSearch();
+    }
+
     setupEventListeners() {
+        // Sidebar toggle
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            this.toggleSidebar();
+        });
+
         // Navigation
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.addEventListener('click', (e) => {
-                this.navigateToPage(e.currentTarget.dataset.page);
-            });
-        });
-        
-        // Search functionality
-        document.querySelectorAll('.search-input').forEach(input => {
-            input.addEventListener('input', (e) => {
-                this.handleSearch(e.target.value, e.target.closest('.page-content').id);
-            });
-        });
-        
-        // Filter functionality
-        document.querySelectorAll('.filter-select').forEach(select => {
-            select.addEventListener('change', (e) => {
-                this.handleFilter(e.target.value, e.target.closest('.page-content').id);
-            });
-        });
-        
-        // Modal forms
-        const addItemForm = document.getElementById('addItemForm');
-        if (addItemForm) {
-            addItemForm.addEventListener('submit', (e) => {
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.addInventoryItem(e.target);
+                this.handleNavigation(e.target.closest('.nav-link').getAttribute('href'));
+            });
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            this.logout();
+        });
+
+        // Notifications
+        document.getElementById('notificationsBtn').addEventListener('click', () => {
+            this.showNotificationsModal();
+        });
+
+        document.getElementById('markAllRead').addEventListener('click', () => {
+            this.markAllNotificationsRead();
+        });
+
+        // Search
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            this.showSearchModal();
+        });
+
+        // Fullscreen
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+            this.toggleFullscreen();
+        });
+
+        // Quick actions
+        document.getElementById('addItemBtn').addEventListener('click', () => {
+            this.showAddItemModal();
+        });
+
+        document.getElementById('createOrderBtn').addEventListener('click', () => {
+            this.showCreateOrderModal();
+        });
+
+        document.getElementById('addSupplierBtn').addEventListener('click', () => {
+            this.showAddSupplierModal();
+        });
+
+        document.getElementById('generateReportBtn').addEventListener('click', () => {
+            this.generateReport();
+        });
+
+        // Chart period change
+        document.getElementById('chartPeriod').addEventListener('change', (e) => {
+            this.updateInventoryChart(e.target.value);
+        });
+
+        // Modal close events
+        document.querySelectorAll('.modal-close').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                this.closeModal(e.target.closest('.modal'));
+            });
+        });
+
+        // Close modals on outside click
+        document.querySelectorAll('.modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    this.closeModal(modal);
+                }
+            });
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            this.handleKeyboardShortcuts(e);
+        });
+    }
+
+    async loadDashboardData() {
+        try {
+            // Load stats
+            await this.loadStats();
+            
+            // Load recent activities
+            await this.loadRecentActivities();
+            
+            // Load notifications
+            await this.loadNotifications();
+            
+        } catch (error) {
+            console.error('Failed to load dashboard data:', error);
+            this.showError('Failed to load dashboard data');
+        }
+    }
+
+    async loadStats() {
+        try {
+            const response = await this.apiCall('/dashboard/stats');
+            if (response.success) {
+                this.updateStats(response.data);
+            }
+        } catch (error) {
+            console.error('Failed to load stats:', error);
+            // Use mock data for demo
+            this.updateStats({
+                totalItems: 12847,
+                totalValue: 2400000,
+                pendingOrders: 23,
+                activeSuppliers: 156
             });
         }
-        
-        // Close modals when clicking outside
-        window.addEventListener('click', (e) => {
-            if (e.target.classList.contains('modal')) {
-                this.closeModal(e.target.id);
+    }
+
+    async loadRecentActivities() {
+        try {
+            const response = await this.apiCall('/dashboard/activities');
+            if (response.success) {
+                this.activities = response.data;
+                this.renderActivities();
             }
-        });
+        } catch (error) {
+            console.error('Failed to load activities:', error);
+            // Use mock data for demo
+            this.activities = this.getMockActivities();
+            this.renderActivities();
+        }
     }
-    
-    setupRoleBasedAccess() {
-        const adminOnlyElements = document.querySelectorAll('.admin-only');
-        adminOnlyElements.forEach(element => {
-            if (!this.currentUser.permissions.includes('admin')) {
-                element.style.display = 'none';
+
+    async loadNotifications() {
+        try {
+            const response = await this.apiCall('/dashboard/notifications');
+            if (response.success) {
+                this.notifications = response.data;
+                this.renderNotifications();
             }
+        } catch (error) {
+            console.error('Failed to load notifications:', error);
+            // Use mock data for demo
+            this.notifications = this.getMockNotifications();
+            this.renderNotifications();
+        }
+    }
+
+    updateStats(stats) {
+        document.getElementById('totalItems').textContent = this.formatNumber(stats.totalItems);
+        document.getElementById('totalValue').textContent = this.formatCurrency(stats.totalValue);
+        document.getElementById('pendingOrders').textContent = stats.pendingOrders;
+        document.getElementById('activeSuppliers').textContent = stats.activeSuppliers;
+    }
+
+    renderActivities() {
+        const container = document.getElementById('activityList');
+        container.innerHTML = '';
+
+        this.activities.slice(0, 5).forEach(activity => {
+            const activityElement = this.createActivityElement(activity);
+            container.appendChild(activityElement);
         });
     }
-    
-    navigateToPage(pageName) {
-        // Hide all pages
-        document.querySelectorAll('.page-content, .dashboard-content').forEach(page => {
-            page.style.display = 'none';
+
+    renderNotifications() {
+        const container = document.getElementById('notificationsList');
+        const modalContainer = document.getElementById('modalNotificationsList');
+        
+        container.innerHTML = '';
+        modalContainer.innerHTML = '';
+
+        this.notifications.slice(0, 3).forEach(notification => {
+            const notificationElement = this.createNotificationElement(notification);
+            container.appendChild(notificationElement);
         });
-        
-        // Show selected page
-        const targetPage = document.getElementById(pageName + '-page') || document.getElementById('dashboard-page');
-        if (targetPage) {
-            targetPage.style.display = 'block';
-        }
-        
-        // Update active menu item
-        document.querySelectorAll('.menu-item').forEach(item => {
-            item.classList.remove('active');
+
+        this.notifications.forEach(notification => {
+            const notificationElement = this.createNotificationElement(notification, true);
+            modalContainer.appendChild(notificationElement);
         });
-        document.querySelector(`[data-page="${pageName}"]`).classList.add('active');
-        
-        // Update page title
-        const pageTitle = document.querySelector('.page-title');
-        if (pageTitle) {
-            pageTitle.textContent = this.getPageTitle(pageName);
-        }
-        
-        // Load page-specific data
-        this.loadPageData(pageName);
-    }
-    
-    getPageTitle(pageName) {
-        const titles = {
-            dashboard: 'Dashboard',
-            inventory: 'Inventory Management',
-            'purchase-orders': 'Purchase Orders',
-            suppliers: 'Supplier Management',
-            reports: 'Reports & Analytics',
-            users: 'User Management',
-            settings: 'Settings'
-        };
-        return titles[pageName] || 'Dashboard';
-    }
-    
-    loadPageData(pageName) {
-        switch (pageName) {
-            case 'inventory':
-                this.loadInventoryTable();
-                break;
-            case 'purchase-orders':
-                this.loadPurchaseOrdersTable();
-                break;
-            case 'suppliers':
-                this.loadSuppliersTable();
-                break;
-            case 'reports':
-                this.loadReports();
-                break;
+
+        // Update notification badge
+        const unreadCount = this.notifications.filter(n => !n.read).length;
+        const badge = document.querySelector('.notification-badge');
+        if (unreadCount > 0) {
+            badge.textContent = unreadCount;
+            badge.style.display = 'block';
+        } else {
+            badge.style.display = 'none';
         }
     }
-    
-    loadDashboardData() {
-        // Update metrics
-        this.updateMetrics();
-        
-        // Load recent activity
-        this.loadRecentActivity();
+
+    createActivityElement(activity) {
+        const div = document.createElement('div');
+        div.className = 'activity-item slide-up';
+        div.innerHTML = `
+            <div class="activity-icon" style="background: ${this.getActivityColor(activity.type)}">
+                <i class="${this.getActivityIcon(activity.type)}"></i>
+            </div>
+            <div class="activity-content">
+                <p>${activity.description}</p>
+                <span class="activity-time">${this.formatTimeAgo(activity.timestamp)}</span>
+            </div>
+        `;
+        return div;
     }
-    
-    updateMetrics() {
-        const totalItems = this.inventoryData.length;
-        const lowStockItems = this.inventoryData.filter(item => item.quantity < 10).length;
-        const pendingOrders = this.purchaseOrders.filter(order => order.status === 'Pending').length;
-        const monthlySpend = this.purchaseOrders
-            .filter(order => order.status === 'Approved')
-            .reduce((sum, order) => sum + order.totalAmount, 0);
-        
-        // Update metric values (in a real app, these would be updated via DOM manipulation)
-        console.log('Metrics updated:', { totalItems, lowStockItems, pendingOrders, monthlySpend });
-    }
-    
-    loadRecentActivity() {
-        // This would typically load from a backend API
-        console.log('Recent activity loaded');
-    }
-    
-    loadInventoryTable() {
-        const tbody = document.getElementById('inventory-table-body');
-        if (!tbody) return;
-        
-        tbody.innerHTML = this.inventoryData.map(item => `
-            <tr>
-                <td>${item.sku}</td>
-                <td>${item.name}</td>
-                <td>${item.category}</td>
-                <td>${item.quantity}</td>
-                <td>${item.location}</td>
-                <td>$${item.unitPrice.toFixed(2)}</td>
-                <td><span class="status-badge ${item.status.toLowerCase().replace(' ', '-')}">${item.status}</span></td>
-                <td>
-                    <button class="action-btn edit" onclick="ims.editItem('${item.sku}')">
-                        <i class="fa-solid fa-edit"></i>
-                    </button>
-                    <button class="action-btn delete" onclick="ims.deleteItem('${item.sku}')">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-    
-    loadPurchaseOrdersTable() {
-        const tbody = document.getElementById('orders-table-body');
-        if (!tbody) return;
-        
-        tbody.innerHTML = this.purchaseOrders.map(order => `
-            <tr>
-                <td>${order.id}</td>
-                <td>${order.supplier}</td>
-                <td>${order.items}</td>
-                <td>$${order.totalAmount.toFixed(2)}</td>
-                <td><span class="status-badge ${order.status.toLowerCase()}">${order.status}</span></td>
-                <td>${order.createdDate}</td>
-                <td>
-                    <button class="action-btn view" onclick="ims.viewOrder('${order.id}')">
-                        <i class="fa-solid fa-eye"></i>
-                    </button>
-                    ${order.status === 'Pending' ? `
-                        <button class="action-btn edit" onclick="ims.approveOrder('${order.id}')">
-                            <i class="fa-solid fa-check"></i>
-                        </button>
-                        <button class="action-btn delete" onclick="ims.rejectOrder('${order.id}')">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                    ` : ''}
-                </td>
-            </tr>
-        `).join('');
-    }
-    
-    loadSuppliersTable() {
-        const tbody = document.getElementById('suppliers-table-body');
-        if (!tbody) return;
-        
-        tbody.innerHTML = this.suppliers.map(supplier => `
-            <tr>
-                <td>${supplier.id}</td>
-                <td>${supplier.companyName}</td>
-                <td>${supplier.contactPerson}</td>
-                <td>${supplier.email}</td>
-                <td>${supplier.phone}</td>
-                <td>${supplier.category}</td>
-                <td>
-                    <button class="action-btn edit" onclick="ims.editSupplier('${supplier.id}')">
-                        <i class="fa-solid fa-edit"></i>
-                    </button>
-                    <button class="action-btn delete" onclick="ims.deleteSupplier('${supplier.id}')">
-                        <i class="fa-solid fa-trash"></i>
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    }
-    
-    loadReports() {
-        // Initialize report charts
-        this.initializeReportCharts();
-    }
-    
-    handleSearch(query, pageId) {
-        console.log('Searching for:', query, 'on page:', pageId);
-        // Implement search logic based on page
-    }
-    
-    handleFilter(filterValue, pageId) {
-        console.log('Filtering by:', filterValue, 'on page:', pageId);
-        // Implement filter logic based on page
-    }
-    
-    // Modal Functions
-    openAddItemModal() {
-        document.getElementById('addItemModal').style.display = 'block';
-    }
-    
-    openAddOrderModal() {
-        // Implementation for purchase order modal
-        alert('Purchase Order modal would open here');
-    }
-    
-    openAddSupplierModal() {
-        // Implementation for supplier modal
-        alert('Supplier modal would open here');
-    }
-    
-    closeModal(modalId) {
-        document.getElementById(modalId).style.display = 'none';
-    }
-    
-    // CRUD Operations
-    addInventoryItem(form) {
-        const formData = new FormData(form);
-        const newItem = {
-            sku: formData.get('sku'),
-            name: formData.get('name'),
-            category: formData.get('category'),
-            quantity: parseInt(formData.get('quantity')),
-            location: formData.get('location'),
-            unitPrice: parseFloat(formData.get('price')),
-            status: 'In Stock'
-        };
-        
-        this.inventoryData.push(newItem);
-        this.loadInventoryTable();
-        this.closeModal('addItemModal');
-        form.reset();
-        
-        // Show success message
-        this.showNotification('Item added successfully!', 'success');
-    }
-    
-    editItem(sku) {
-        const item = this.inventoryData.find(item => item.sku === sku);
-        if (item) {
-            alert(`Edit item: ${item.name}`);
-            // Implementation for edit modal
-        }
-    }
-    
-    deleteItem(sku) {
-        if (confirm('Are you sure you want to delete this item?')) {
-            this.inventoryData = this.inventoryData.filter(item => item.sku !== sku);
-            this.loadInventoryTable();
-            this.showNotification('Item deleted successfully!', 'success');
-        }
-    }
-    
-    viewOrder(orderId) {
-        const order = this.purchaseOrders.find(order => order.id === orderId);
-        if (order) {
-            alert(`View order details: ${order.id}`);
-            // Implementation for order details modal
-        }
-    }
-    
-    approveOrder(orderId) {
-        const order = this.purchaseOrders.find(order => order.id === orderId);
-        if (order) {
-            order.status = 'Approved';
-            this.loadPurchaseOrdersTable();
-            this.showNotification('Order approved successfully!', 'success');
-        }
-    }
-    
-    rejectOrder(orderId) {
-        const order = this.purchaseOrders.find(order => order.id === orderId);
-        if (order) {
-            order.status = 'Rejected';
-            this.loadPurchaseOrdersTable();
-            this.showNotification('Order rejected!', 'warning');
-        }
-    }
-    
-    editSupplier(supplierId) {
-        const supplier = this.suppliers.find(supplier => supplier.id === supplierId);
-        if (supplier) {
-            alert(`Edit supplier: ${supplier.companyName}`);
-            // Implementation for edit supplier modal
-        }
-    }
-    
-    deleteSupplier(supplierId) {
-        if (confirm('Are you sure you want to delete this supplier?')) {
-            this.suppliers = this.suppliers.filter(supplier => supplier.id !== supplierId);
-            this.loadSuppliersTable();
-            this.showNotification('Supplier deleted successfully!', 'success');
-        }
-    }
-    
-    // Chart Functions
-    initializeCharts() {
-        // Simple chart implementation using canvas
-        this.drawInventoryChart();
-        this.drawOrdersChart();
-    }
-    
-    initializeReportCharts() {
-        // Initialize report-specific charts
-        console.log('Report charts initialized');
-    }
-    
-    drawInventoryChart() {
-        const canvas = document.getElementById('inventoryChart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        const data = [150, 5, 75, 45, 30]; // Sample data
-        const labels = ['Steel Pipes', 'Aluminum', 'Finished A', 'Spare Parts', 'Others'];
-        
-        this.drawBarChart(ctx, data, labels, '#3b82f6');
-    }
-    
-    drawOrdersChart() {
-        const canvas = document.getElementById('ordersChart');
-        if (!canvas) return;
-        
-        const ctx = canvas.getContext('2d');
-        const data = [8, 12, 3, 5]; // Sample data
-        const labels = ['Pending', 'Approved', 'Rejected', 'Delivered'];
-        
-        this.drawPieChart(ctx, data, labels);
-    }
-    
-    drawBarChart(ctx, data, labels, color) {
-        const width = ctx.canvas.width;
-        const height = ctx.canvas.height;
-        const barWidth = width / data.length * 0.8;
-        const barSpacing = width / data.length * 0.2;
-        const maxValue = Math.max(...data);
-        
-        ctx.clearRect(0, 0, width, height);
-        
-        data.forEach((value, index) => {
-            const barHeight = (value / maxValue) * (height - 40);
-            const x = index * (barWidth + barSpacing) + barSpacing / 2;
-            const y = height - barHeight - 20;
-            
-            ctx.fillStyle = color;
-            ctx.fillRect(x, y, barWidth, barHeight);
-            
-            // Draw label
-            ctx.fillStyle = '#475569';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'center';
-            ctx.fillText(labels[index], x + barWidth / 2, height - 5);
-        });
-    }
-    
-    drawPieChart(ctx, data, labels) {
-        const width = ctx.canvas.width;
-        const height = ctx.canvas.height;
-        const centerX = width / 2;
-        const centerY = height / 2;
-        const radius = Math.min(width, height) / 3;
-        
-        const colors = ['#3b82f6', '#10b981', '#ef4444', '#f59e0b'];
-        const total = data.reduce((sum, value) => sum + value, 0);
-        
-        ctx.clearRect(0, 0, width, height);
-        
-        let currentAngle = 0;
-        data.forEach((value, index) => {
-            const sliceAngle = (value / total) * 2 * Math.PI;
-            
-            ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, currentAngle, currentAngle + sliceAngle);
-            ctx.closePath();
-            
-            ctx.fillStyle = colors[index];
-            ctx.fill();
-            
-            currentAngle += sliceAngle;
-        });
-    }
-    
-    // Utility Functions
-    showNotification(message, type = 'info') {
-        // Create notification element
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 1rem 1.5rem;
-            border-radius: 8px;
-            color: white;
-            font-weight: 500;
-            z-index: 3000;
-            animation: slideIn 0.3s ease;
+
+    createNotificationElement(notification, isModal = false) {
+        const div = document.createElement('div');
+        div.className = `notification-item ${!notification.read ? 'unread' : ''} slide-up`;
+        div.innerHTML = `
+            <div class="notification-icon">
+                <i class="${this.getNotificationIcon(notification.type)}"></i>
+            </div>
+            <div class="notification-content">
+                <h4>${notification.title}</h4>
+                <p>${notification.message}</p>
+                <span class="notification-time">${this.formatTimeAgo(notification.timestamp)}</span>
+            </div>
+            ${!notification.read ? '<div class="notification-dot"></div>' : ''}
         `;
         
-        // Set background color based on type
-        const colors = {
-            success: '#10b981',
-            warning: '#f59e0b',
-            error: '#ef4444',
-            info: '#3b82f6'
-        };
-        notification.style.background = colors[type] || colors.info;
-        
-        document.body.appendChild(notification);
-        
-        // Remove after 3 seconds
-        setTimeout(() => {
-            notification.remove();
-        }, 3000);
-    }
-    
-    exportReport(type) {
-        let data, filename;
-        
-        switch (type) {
-            case 'inventory':
-                data = this.inventoryData;
-                filename = 'inventory_report.csv';
-                break;
-            case 'orders':
-                data = this.purchaseOrders;
-                filename = 'purchase_orders_report.csv';
-                break;
-            default:
-                return;
+        if (!notification.read) {
+            div.addEventListener('click', () => this.markNotificationRead(notification.id));
         }
         
-        // Convert to CSV
-        const csv = this.convertToCSV(data);
-        
-        // Download file
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        a.click();
-        window.URL.revokeObjectURL(url);
-        
-        this.showNotification(`${type} report exported successfully!`, 'success');
+        return div;
     }
-    
-    convertToCSV(data) {
-        if (data.length === 0) return '';
+
+    initializeCharts() {
+        this.createInventoryChart();
+        this.createCategoryChart();
+    }
+
+    createInventoryChart() {
+        const ctx = document.getElementById('inventoryChart').getContext('2d');
         
-        const headers = Object.keys(data[0]);
-        const csvRows = [headers.join(',')];
-        
-        data.forEach(row => {
-            const values = headers.map(header => {
-                const value = row[header];
-                return typeof value === 'string' ? `"${value}"` : value;
-            });
-            csvRows.push(values.join(','));
+        this.charts.inventory = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: this.getLast30Days(),
+                datasets: [{
+                    label: 'Inventory Value',
+                    data: this.generateMockInventoryData(),
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
         });
+    }
+
+    createCategoryChart() {
+        const ctx = document.getElementById('categoryChart').getContext('2d');
         
-        return csvRows.join('\n');
+        this.charts.category = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Electronics', 'Clothing', 'Food', 'Books', 'Other'],
+                datasets: [{
+                    data: [30, 25, 20, 15, 10],
+                    backgroundColor: [
+                        '#2563eb',
+                        '#10b981',
+                        '#f59e0b',
+                        '#8b5cf6',
+                        '#64748b'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            padding: 20,
+                            usePointStyle: true
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    updateInventoryChart(days) {
+        if (this.charts.inventory) {
+            this.charts.inventory.data.labels = this.getLastDays(days);
+            this.charts.inventory.data.datasets[0].data = this.generateMockInventoryData(days);
+            this.charts.inventory.update();
+        }
+    }
+
+    initializeSidebar() {
+        // Add active class to current nav item
+        const currentPath = window.location.hash || '#dashboard';
+        document.querySelectorAll('.nav-link').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.parentElement.classList.add('active');
+            }
+        });
+    }
+
+    initializeModals() {
+        // Modal functionality is handled in event listeners
+    }
+
+    initializeSearch() {
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                this.performSearch(e.target.value);
+            }, 300);
+        });
+    }
+
+    async performSearch(query) {
+        if (!query.trim()) {
+            document.getElementById('searchResults').innerHTML = '';
+            return;
+        }
+
+        try {
+            const response = await this.apiCall(`/search?q=${encodeURIComponent(query)}`);
+            if (response.success) {
+                this.renderSearchResults(response.data);
+            }
+        } catch (error) {
+            console.error('Search failed:', error);
+            // Show mock results for demo
+            this.renderSearchResults(this.getMockSearchResults(query));
+        }
+    }
+
+    renderSearchResults(results) {
+        const container = document.getElementById('searchResults');
+        container.innerHTML = '';
+
+        if (results.length === 0) {
+            container.innerHTML = '<p class="no-results">No results found</p>';
+            return;
+        }
+
+        results.forEach(result => {
+            const div = document.createElement('div');
+            div.className = 'search-result-item';
+            div.innerHTML = `
+                <div class="result-icon">
+                    <i class="${this.getSearchResultIcon(result.type)}"></i>
+                </div>
+                <div class="result-content">
+                    <h4>${result.title}</h4>
+                    <p>${result.description}</p>
+                </div>
+            `;
+            div.addEventListener('click', () => this.handleSearchResultClick(result));
+            container.appendChild(div);
+        });
+    }
+
+    startRealTimeUpdates() {
+        // Update stats every 30 seconds
+        setInterval(() => {
+            this.loadStats();
+        }, 30000);
+
+        // Update activities every 2 minutes
+        setInterval(() => {
+            this.loadRecentActivities();
+        }, 120000);
+
+        // Update notifications every minute
+        setInterval(() => {
+            this.loadNotifications();
+        }, 60000);
+    }
+
+    updateDateTime() {
+        const now = new Date();
+        const dateElement = document.getElementById('currentDate');
+        const timeElement = document.getElementById('currentTime');
+
+        dateElement.textContent = now.toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        timeElement.textContent = now.toLocaleTimeString('en-US', {
+            hour12: true,
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    }
+
+    updateUserInfo() {
+        if (this.currentUser) {
+            document.getElementById('userName').textContent = `${this.currentUser.first_name} ${this.currentUser.last_name}`;
+            document.getElementById('userRole').textContent = this.currentUser.role;
+        }
+    }
+
+    toggleSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        sidebar.classList.toggle('collapsed');
+    }
+
+    showNotificationsModal() {
+        document.getElementById('notificationsModal').classList.add('active');
+    }
+
+    showSearchModal() {
+        document.getElementById('searchModal').classList.add('active');
+        document.getElementById('searchInput').focus();
+    }
+
+    closeModal(modal) {
+        modal.classList.remove('active');
+    }
+
+    async logout() {
+        try {
+            const token = localStorage.getItem('access_token');
+            if (token) {
+                await fetch(`${this.apiBaseUrl}/auth/logout`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Logout error:', error);
+        } finally {
+            localStorage.removeItem('access_token');
+            window.location.href = 'index.html';
+        }
+    }
+
+    toggleFullscreen() {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+        } else {
+            document.exitFullscreen();
+        }
+    }
+
+    handleNavigation(hash) {
+        // Remove active class from all nav items
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        // Add active class to clicked item
+        const navItem = document.querySelector(`[href="${hash}"]`).parentElement;
+        navItem.classList.add('active');
+
+        // Handle navigation (in a real app, this would load different content)
+        console.log(`Navigating to: ${hash}`);
+    }
+
+    handleKeyboardShortcuts(e) {
+        // Ctrl/Cmd + K for search
+        if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+            e.preventDefault();
+            this.showSearchModal();
+        }
+
+        // Escape to close modals
+        if (e.key === 'Escape') {
+            const activeModal = document.querySelector('.modal.active');
+            if (activeModal) {
+                this.closeModal(activeModal);
+            }
+        }
+    }
+
+    hideLoadingScreen() {
+        const loadingScreen = document.getElementById('loadingScreen');
+        loadingScreen.classList.add('hidden');
+        setTimeout(() => {
+            loadingScreen.style.display = 'none';
+        }, 500);
+    }
+
+    showError(message) {
+        // Create and show error notification
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-notification';
+        errorDiv.innerHTML = `
+            <i class="fas fa-exclamation-triangle"></i>
+            <span>${message}</span>
+        `;
+        document.body.appendChild(errorDiv);
+
+        setTimeout(() => {
+            errorDiv.remove();
+        }, 5000);
+    }
+
+    async apiCall(endpoint, options = {}) {
+        const token = localStorage.getItem('access_token');
+        const defaultOptions = {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            }
+        };
+
+        const response = await fetch(`${this.apiBaseUrl}${endpoint}`, {
+            ...defaultOptions,
+            ...options
+        });
+
+        if (!response.ok) {
+            throw new Error(`API call failed: ${response.status}`);
+        }
+
+        return await response.json();
+    }
+
+    // Utility methods
+    formatNumber(num) {
+        return new Intl.NumberFormat().format(num);
+    }
+
+    formatCurrency(amount) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        }).format(amount);
+    }
+
+    formatTimeAgo(timestamp) {
+        const now = new Date();
+        const time = new Date(timestamp);
+        const diffInSeconds = Math.floor((now - time) / 1000);
+
+        if (diffInSeconds < 60) return 'Just now';
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+        return `${Math.floor(diffInSeconds / 86400)}d ago`;
+    }
+
+    getLast30Days() {
+        const dates = [];
+        for (let i = 29; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            dates.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        }
+        return dates;
+    }
+
+    getLastDays(days) {
+        const dates = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const date = new Date();
+            date.setDate(date.getDate() - i);
+            dates.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        }
+        return dates;
+    }
+
+    generateMockInventoryData(days = 30) {
+        const data = [];
+        let baseValue = 2000000;
+        
+        for (let i = 0; i < days; i++) {
+            baseValue += (Math.random() - 0.5) * 100000;
+            data.push(Math.max(0, baseValue));
+        }
+        
+        return data;
+    }
+
+    getActivityColor(type) {
+        const colors = {
+            'inventory': '#10b981',
+            'order': '#3b82f6',
+            'supplier': '#f59e0b',
+            'user': '#8b5cf6',
+            'system': '#64748b'
+        };
+        return colors[type] || '#64748b';
+    }
+
+    getActivityIcon(type) {
+        const icons = {
+            'inventory': 'fas fa-boxes',
+            'order': 'fas fa-shopping-cart',
+            'supplier': 'fas fa-truck',
+            'user': 'fas fa-user',
+            'system': 'fas fa-cog'
+        };
+        return icons[type] || 'fas fa-info-circle';
+    }
+
+    getNotificationIcon(type) {
+        const icons = {
+            'warning': 'fas fa-exclamation-triangle',
+            'info': 'fas fa-info-circle',
+            'success': 'fas fa-check-circle',
+            'error': 'fas fa-times-circle'
+        };
+        return icons[type] || 'fas fa-bell';
+    }
+
+    getSearchResultIcon(type) {
+        const icons = {
+            'inventory': 'fas fa-boxes',
+            'order': 'fas fa-shopping-cart',
+            'supplier': 'fas fa-truck',
+            'user': 'fas fa-user'
+        };
+        return icons[type] || 'fas fa-search';
+    }
+
+    // Mock data methods
+    getMockActivities() {
+        return [
+            {
+                id: 1,
+                type: 'inventory',
+                description: 'New item "Laptop Dell XPS 13" added to inventory',
+                timestamp: new Date(Date.now() - 5 * 60 * 1000)
+            },
+            {
+                id: 2,
+                type: 'order',
+                description: 'Purchase order #PO-2024-001 approved',
+                timestamp: new Date(Date.now() - 15 * 60 * 1000)
+            },
+            {
+                id: 3,
+                type: 'supplier',
+                description: 'Supplier "Tech Solutions Inc." updated',
+                timestamp: new Date(Date.now() - 30 * 60 * 1000)
+            },
+            {
+                id: 4,
+                type: 'user',
+                description: 'New user "Sarah Johnson" registered',
+                timestamp: new Date(Date.now() - 60 * 60 * 1000)
+            },
+            {
+                id: 5,
+                type: 'system',
+                description: 'System backup completed successfully',
+                timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
+            }
+        ];
+    }
+
+    getMockNotifications() {
+        return [
+            {
+                id: 1,
+                type: 'warning',
+                title: 'Low Stock Alert',
+                message: 'Item "Wireless Mouse" is running low on stock (5 units remaining)',
+                timestamp: new Date(Date.now() - 10 * 60 * 1000),
+                read: false
+            },
+            {
+                id: 2,
+                type: 'info',
+                title: 'New Order Received',
+                message: 'Purchase order #PO-2024-002 has been submitted for approval',
+                timestamp: new Date(Date.now() - 25 * 60 * 1000),
+                read: false
+            },
+            {
+                id: 3,
+                type: 'success',
+                title: 'Backup Complete',
+                message: 'Daily system backup completed successfully at 2:00 AM',
+                timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
+                read: true
+            }
+        ];
+    }
+
+    getMockSearchResults(query) {
+        return [
+            {
+                id: 1,
+                type: 'inventory',
+                title: 'Laptop Dell XPS 13',
+                description: 'High-performance laptop with 16GB RAM, 512GB SSD'
+            },
+            {
+                id: 2,
+                type: 'order',
+                title: 'Purchase Order #PO-2024-001',
+                description: 'Order for office supplies - Status: Approved'
+            },
+            {
+                id: 3,
+                type: 'supplier',
+                title: 'Tech Solutions Inc.',
+                description: 'Electronics supplier - Contact: John Smith'
+            }
+        ].filter(item => 
+            item.title.toLowerCase().includes(query.toLowerCase()) ||
+            item.description.toLowerCase().includes(query.toLowerCase())
+        );
+    }
+
+    // Placeholder methods for future implementation
+    showAddItemModal() {
+        console.log('Show add item modal');
+        // Implementation for adding new inventory item
+    }
+
+    showCreateOrderModal() {
+        console.log('Show create order modal');
+        // Implementation for creating new purchase order
+    }
+
+    showAddSupplierModal() {
+        console.log('Show add supplier modal');
+        // Implementation for adding new supplier
+    }
+
+    generateReport() {
+        console.log('Generate report');
+        // Implementation for generating reports
+    }
+
+    async markNotificationRead(notificationId) {
+        try {
+            await this.apiCall(`/notifications/${notificationId}/read`, {
+                method: 'PUT'
+            });
+            this.loadNotifications();
+        } catch (error) {
+            console.error('Failed to mark notification as read:', error);
+        }
+    }
+
+    async markAllNotificationsRead() {
+        try {
+            await this.apiCall('/notifications/mark-all-read', {
+                method: 'PUT'
+            });
+            this.loadNotifications();
+        } catch (error) {
+            console.error('Failed to mark all notifications as read:', error);
+        }
+    }
+
+    handleSearchResultClick(result) {
+        console.log('Search result clicked:', result);
+        this.closeModal(document.getElementById('searchModal'));
+        // Implementation for handling search result clicks
     }
 }
 
-// Global functions for HTML onclick handlers
-function toggleSidebar() {
-    const sidebar = document.querySelector('.sidebar');
-    sidebar.classList.toggle('open');
-}
+// === Inventory Section Integration ===
 
-function logout() {
-    if (confirm('Are you sure you want to logout?')) {
-        window.location.href = 'login.html';
-    }
-}
-
-function openAddItemModal() {
-    ims.openAddItemModal();
-}
-
-function openAddOrderModal() {
-    ims.openAddOrderModal();
-}
-
-function openAddSupplierModal() {
-    ims.openAddSupplierModal();
-}
-
-function closeModal(modalId) {
-    ims.closeModal(modalId);
-}
-
-function exportReport(type) {
-    ims.exportReport(type);
-}
-
-// Initialize the system when DOM is loaded
-let ims;
 document.addEventListener('DOMContentLoaded', () => {
-    ims = new InventoryManagementSystem();
+    loadAndRenderInventory();
+    setupExportButtons();
 });
 
-// Add CSS for notifications
+async function loadAndRenderInventory() {
+    try {
+        const response = await fetch('http://localhost:5000/api/inventory');
+        const data = await response.json();
+        if (Array.isArray(data.items)) {
+            renderInventoryTable(data.items);
+        }
+    } catch (error) {
+        renderInventoryTable([]);
+    }
+}
+
+function renderInventoryTable(items) {
+    const tbody = document.getElementById('inventoryTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${item.id}</td>
+            <td>${item.sku}</td>
+            <td>${item.name}</td>
+            <td>${item.quantity}</td>
+            <td>${item.location || ''}</td>
+            <td><img src="${item.qr_code || ''}" alt="QR" style="width:48px;height:48px;"></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function setupExportButtons() {
+    const csvBtn = document.getElementById('exportCsvBtn');
+    const pdfBtn = document.getElementById('exportPdfBtn');
+    if (csvBtn) {
+        csvBtn.addEventListener('click', () => {
+            window.open('http://localhost:5000/api/inventory/export/csv', '_blank');
+        });
+    }
+    if (pdfBtn) {
+        pdfBtn.addEventListener('click', () => {
+            window.open('http://localhost:5000/api/inventory/export/pdf', '_blank');
+        });
+    }
+}
+
+// Add CSS for error notifications
 const style = document.createElement('style');
 style.textContent = `
-    @keyframes slideIn {
+    .error-notification {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: #ef4444;
+        color: white;
+        padding: 1rem 1.5rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        z-index: 10000;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        animation: slideInRight 0.3s ease-out;
+    }
+
+    @keyframes slideInRight {
         from {
             transform: translateX(100%);
             opacity: 0;
@@ -629,6 +952,152 @@ style.textContent = `
             transform: translateX(0);
             opacity: 1;
         }
+    }
+
+    .activity-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 8px;
+        background: #f8fafc;
+        transition: background 0.2s ease;
+        margin-bottom: 0.5rem;
+    }
+
+    .activity-item:hover {
+        background: #f1f5f9;
+    }
+
+    .activity-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .activity-content p {
+        margin-bottom: 0.25rem;
+        color: #1e293b;
+        font-weight: 500;
+    }
+
+    .activity-time {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    .notification-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 8px;
+        transition: background 0.2s ease;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        position: relative;
+    }
+
+    .notification-item:hover {
+        background: #f8fafc;
+    }
+
+    .notification-item.unread {
+        background: #eff6ff;
+    }
+
+    .notification-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .notification-item.unread .notification-icon {
+        background: #3b82f6;
+    }
+
+    .notification-content h4 {
+        margin-bottom: 0.25rem;
+        color: #1e293b;
+        font-weight: 600;
+    }
+
+    .notification-content p {
+        margin-bottom: 0.25rem;
+        color: #475569;
+        font-size: 0.9rem;
+    }
+
+    .notification-time {
+        font-size: 0.8rem;
+        color: #64748b;
+    }
+
+    .notification-dot {
+        width: 8px;
+        height: 8px;
+        background: #3b82f6;
+        border-radius: 50%;
+        position: absolute;
+        top: 1rem;
+        right: 1rem;
+    }
+
+    .search-result-item {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: background 0.2s ease;
+        margin-bottom: 0.5rem;
+    }
+
+    .search-result-item:hover {
+        background: #f8fafc;
+    }
+
+    .result-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+        background: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #64748b;
+        font-size: 0.9rem;
+        flex-shrink: 0;
+    }
+
+    .result-content h4 {
+        margin-bottom: 0.25rem;
+        color: #1e293b;
+        font-weight: 600;
+    }
+
+    .result-content p {
+        color: #64748b;
+        font-size: 0.9rem;
+    }
+
+    .no-results {
+        text-align: center;
+        color: #64748b;
+        padding: 2rem;
     }
 `;
 document.head.appendChild(style); 

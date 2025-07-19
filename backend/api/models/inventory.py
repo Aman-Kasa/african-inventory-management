@@ -2,6 +2,9 @@ from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.sql import func
+import qrcode
+import io
+import base64
 
 db = SQLAlchemy()
 
@@ -172,9 +175,9 @@ class InventoryItem(db.Model):
         db.session.add(audit_log)
         db.session.commit()
     
-    def to_dict(self):
+    def to_dict(self, include_qr=False):
         """Convert inventory item to dictionary"""
-        return {
+        data = {
             'id': self.id,
             'sku': self.sku,
             'name': self.name,
@@ -196,6 +199,9 @@ class InventoryItem(db.Model):
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
+        if include_qr:
+            data['qr_code'] = self.get_qr_code_base64()
+        return data
     
     def to_dict_summary(self):
         """Convert to summary dictionary for lists"""
@@ -270,6 +276,18 @@ class InventoryItem(db.Model):
             'low_stock_count': low_stock_count,
             'out_of_stock_count': out_of_stock_count
         }
+    
+    def get_qr_code_base64(self):
+        qr = qrcode.QRCode(box_size=4, border=2)
+        qr.add_data(f'INVENTORY:{self.sku}')
+        qr.make(fit=True)
+        img = qr.make_image(fill_color="black", back_color="white")
+        buf = io.BytesIO()
+        img.save(buf, format='PNG')
+        buf.seek(0)
+        img_bytes = buf.read()
+        base64_str = base64.b64encode(img_bytes).decode('utf-8')
+        return f'data:image/png;base64,{base64_str}'
     
     def __repr__(self):
         return f'<InventoryItem {self.sku}: {self.name}>' 
