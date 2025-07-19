@@ -1,0 +1,35 @@
+{
+  "name": "ipms-frontend",
+  "version": "1.0.0",
+  "description": "Frontend for Inventory & Procurement Management System",
+  "main": "index.html",
+  "scripts": {
+    "start": "python -m http.server 8000",
+    "dev": "python -m http.server 8000",
+    "build": "echo 'Build process would go here'",
+    "test": "echo 'Test process would go here'",
+    "lint": "echo 'Linting process would go here'"
+  },
+  "keywords": [
+    "inventory",
+    "procurement",
+    "management",
+    "africa",
+    "warehouse",
+    "supply-chain"
+  ],
+  "author": "Aman Abraha Kasa",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/ipms-frontend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-username/ipms-frontend/issues"
+  },
+  "homepage": "https://github.com/your-username/ipms-frontend#readme"
+} 
