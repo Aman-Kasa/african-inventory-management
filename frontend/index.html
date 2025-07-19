@@ -3,94 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory & Procurement Management System</title>
+    <title>Login | Inventory & Procurement Management System</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
 </head>
-<body>
-    <header>
-        <nav class="navbar">
-            <div class="logo">Inventory and Procurement Management System</div>
-            <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#workflow">Workflow</a></li>
-                <li><a href="#contact">Contact</a></li>
-            </ul>
-        </nav>
-        <section class="hero">
-            <div class="hero-content">
-                <h1>Smart Inventory & Procurement Management</h1>
-                <p>Streamline your business operations with real-time tracking, automated procurement, and insightful analytics.</p>
-                <a href="#contact" class="cta-btn">Get Started</a>
-            </div>
-            <div class="hero-image">
-                <img src="https://img.freepik.com/free-vector/warehouse-concept-illustration_114360-2581.jpg" alt="Inventory Illustration">
-            </div>
-        </section>
-    </header>
-    <main>
-        <section id="features" class="features-section">
-            <h2>Key Features</h2>
-            <div class="features-grid">
-                <div class="feature-card">
-                    <span class="feature-icon">📦</span>
-                    <h3>Inventory Tracking</h3>
-                    <p>Monitor stock levels, locations, and movements in real-time.</p>
+<body class="login-bg">
+    <div class="login-container">
+        <div class="login-visual">
+            <img src="https://img.freepik.com/free-vector/warehouse-concept-illustration_114360-2581.jpg" alt="Inventory Illustration" class="login-illustration">
+        </div>
+        <div class="login-card">
+            <div class="login-logo"><i class="fa-solid fa-boxes-stacked"></i> Inventory and Procurement Management System</div>
+            <h2><i class="fa-solid fa-warehouse"></i> Sign In</h2>
+            <form class="login-form">
+                <div class="input-icon-group">
+                    <span class="input-icon"><i class="fa-solid fa-envelope"></i></span>
+                    <input type="email" placeholder="Email" required>
                 </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🛒</span>
-                    <h3>Automated Procurement</h3>
-                    <p>Auto-generate purchase orders and manage suppliers efficiently.</p>
+                <div class="input-icon-group">
+                    <span class="input-icon"><i class="fa-solid fa-lock"></i></span>
+                    <input type="password" placeholder="Password" required>
                 </div>
-                <div class="feature-card">
-                    <span class="feature-icon">📊</span>
-                    <h3>Analytics & Reports</h3>
-                    <p>Gain insights with customizable dashboards and reports.</p>
-                </div>
-                <div class="feature-card">
-                    <span class="feature-icon">🔒</span>
-                    <h3>Secure & Reliable</h3>
-                    <p>Data encryption and role-based access for maximum security.</p>
-                </div>
-            </div>
-        </section>
-        <section id="workflow" class="workflow-section">
-            <h2>How It Works</h2>
-            <div class="workflow-steps">
-                <div class="step">
-                    <div class="step-number">1</div>
-                    <h4>Register & Set Up</h4>
-                    <p>Create your account and configure your inventory settings.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">2</div>
-                    <h4>Add Products & Suppliers</h4>
-                    <p>Input your products and supplier details for seamless management.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">3</div>
-                    <h4>Track & Procure</h4>
-                    <p>Monitor inventory and automate procurement as needed.</p>
-                </div>
-                <div class="step">
-                    <div class="step-number">4</div>
-                    <h4>Analyze & Optimize</h4>
-                    <p>Use analytics to optimize stock and procurement strategies.</p>
-                </div>
-            </div>
-        </section>
-        <section id="contact" class="contact-section">
-            <h2>Ready to Transform Your Inventory?</h2>
-            <form class="contact-form" onsubmit="return handleFormSubmit(event)">
-                <input type="text" placeholder="Your Name" required>
-                <input type="email" placeholder="Your Email" required>
-                <textarea placeholder="Your Message" required></textarea>
-                <button type="submit">Request a Demo</button>
+                <button type="submit" class="login-btn">Login</button>
             </form>
-        </section>
-    </main>
-    <footer>
-        <p>&copy; 2025 Inventory and Procurement Management System. All rights reserved.</p>
-    </footer>
+            <div class="login-links">
+                <a href="#" class="forgot-link">Forgot password?</a>
+                <span> | </span>
+                <a href="#" class="signup-link">Sign up</a>
+            </div>
+        </div>
+        <div class="login-visual">
+            <img src="https://img.freepik.com/free-vector/warehouse-workers-concept-illustration_114360-2582.jpg" alt="Procurement Illustration" class="login-illustration">
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html> 
