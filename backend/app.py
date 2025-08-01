@@ -85,7 +85,7 @@ def create_app(config_name='development'):
         app.logger.setLevel(logging.INFO)
         app.logger.info('IPMS startup')
     
-    # Register blueprints
+    # Register blueprints api routes
     from api.routes.auth import auth_bp
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     from api.routes.inventory import inventory_bp
